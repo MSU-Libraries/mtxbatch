@@ -1,2 +1,67 @@
-#!/bin/sh
+#!/bin/bash
+
+# Set defaults
+default_args() {
+    declare -g -A ARGS
+    ARGS[CHANGER]=/dev/changer
+    ARGS[COMMAND]=
+    ARGS[SOURCE]=
+    ARGS[TARGET]=
+    ARGS[EMPTY_SLOT]=
+    ARGS[RUN]=0
+    ARGS[QUIET]=0
+    ARGS[REV_SOURCE]=0
+    ARGS[REV_TARGET]=0
+}
+
+# Parse command arguments
+parse_args() {
+    NON_FLAGS=
+
+    # Parse flag arguments
+    while [[ $# -gt 0 ]]; do
+        ARG="$1"
+        case $ARG in
+        -f)
+            ARGS[CHANGER]="$2"
+            shift; shift ;;
+        --run)
+            ARGS[RUN]=1
+            shift ;;
+        --quiet|-q)
+            ARGS[QUIET]=1
+            shift ;;
+        --use-empty|-e)
+            ARGS[EMPTY_SLOT]="$2"
+            shift; shift ;;
+        --reverse)
+            ARGS[REV_SOURCE]=1
+            ARGS[REV_TARGET]=1
+            shift ;;
+        --reverse-source)
+            ARGS[REV_SOURCE]=1
+            shift ;;
+        --reverse-target)
+            ARGS[REV_TARGET]=1
+            shift ;;
+        *)
+            NON_FLAGS+="$ARG"
+            shift ;;
+        esac
+    done
+
+    # Parse non-flag arguments
+    #TODO
+}
+
+# Validate args
+check_args() {
+    #TODO
+}
+
+# Start
+default_args
+parse_args
+check_args
+
 
