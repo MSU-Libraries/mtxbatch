@@ -16,8 +16,7 @@ default_args() {
 
 # Parse command arguments
 parse_args() {
-    NON_FLAGS=
-
+    declare -a NON_FLAGS
     # Parse flag arguments
     while [[ $# -gt 0 ]]; do
         ARG="$1"
@@ -45,23 +44,47 @@ parse_args() {
             ARGS[REV_TARGET]=1
             shift ;;
         *)
-            NON_FLAGS+="$ARG"
+            NON_FLAGS+=("$ARG")
             shift ;;
         esac
     done
 
     # Parse non-flag arguments
-    #TODO
+    ARGS[COMMAND]=${NON_FLAGS[0]}
+    ARGS[SOURCE]=${NON_FLAGS[1]}
+    ARGS[TARGET]=${NON_FLAGS[2]}
+    # If additional arguments exists, error and exit
+    if [[ ! -z ${NON_FLAGS[3]} ]]; then
+       echo "ERROR: Unknown extra arguments: ${NON_FLAGS[@]:3}"
+       exit 1
+    fi
 }
 
 # Validate args
 check_args() {
     #TODO
+    echo "TODO"
 }
+
+###############################
+## Convert a single integer range to list of integers
+##  $1 -> An integer range (e.g. 3-8) or a simple integer (e.g. 5)
+## Prints the expanded list of ingeters generated from the range, or just prints the simple integer passed
+int_range2list() {
+    #TODO
+    echo "TODO"
+}
+
+# Convert a comma separated list of integers and ranges into a single list of integers
+int_csl2list() {
+    #TODO
+    echo "TODO"
+}
+
 
 # Start
 default_args
-parse_args
+parse_args "$@"
 check_args
 
 
