@@ -190,7 +190,7 @@ array_diff() {
         done
         DIFF+=($V1)
     done
-    echo "${DIFF[@]}"
+    echo "${DIFF[*]}"
 }
 
 ###############################
@@ -219,10 +219,10 @@ generate_move_transfers() {
     TGT=($2)
 
     # Handle cases where source and target slots overlap
-    DIF=$( array_diff "${TGT[@]}" "${SRC[@]}" )
-    while [[ $DIF != $TGT && ${#TGT[@]} -gt 0 ]]; do
+    DIF=($( array_diff "${TGT[*]}" "${SRC[*]}" ))
+    while [[ "${DIF[*]}" != "${TGT[*]}" && ${#DIF[@]} -gt 0 ]]; do
         # Identify slots and index
-        T_SLOT=${TGT[0]}
+        T_SLOT=${DIF[0]}
         IDX=$( index_of_value "${TGT[*]}" $T_SLOT )
         S_SLOT=${SRC[$IDX]}
         # Do the mtx command
@@ -231,7 +231,9 @@ generate_move_transfers() {
         unset SRC[$IDX]
         unset TGT[$IDX]
         # Recalculate to check for another overlap
-        DIF=$( array_diff "${TGT[@]}" "${SRC[@]}" )
+        SRC=(${SRC[*]})
+        TGT=(${TGT[*]})
+        DIF=($( array_diff "${TGT[*]}" "${SRC[*]}" ))
     done
 
     # For remaining slots, move them one for one
