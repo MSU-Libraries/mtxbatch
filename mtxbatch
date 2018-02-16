@@ -1,5 +1,53 @@
 #!/bin/bash
 
+# Script help
+runhelp() {
+    echo ""
+    echo "Usage: mtxchanger -f <changer-device> command SOURCE TARGET [flags]"
+    echo ""
+    echo "    Prints out a series of mtx commands to perform a range of tape"
+    echo "moves, or to swap one range of tapes with another. Will preserve"
+    echo "order of tapes, unless requested to reverse their order during the"
+    echo "operation. Optionally, you can have this script run the mtx commands"
+    echo "rather than just display them."
+    echo ""
+    echo "ARGUMENTS:"
+    echo "  -f <changer-device>"
+    echo "      This specifies the tape changer to be passed to the mtx command"
+    echo "  command"
+    echo "      This can be either 'transfer' or 'swap'. With 'transfer' merely"
+    echo "      moving the tapes from the source slots to the target slots, and"
+    echo "      'swap' doing the same, but also moving tapes from the target"
+    echo "      slots back into the source slots."
+    echo "  SOURCE TARGET"
+    echo "      Both source and target must be a list of comma separated tape"
+    echo "      slot numbers, or slot number ranges."
+    echo ""
+    echo "FLAGS:"
+    echo "  --run"
+    echo "      Attempt to run the mtx commands to perform the given command."
+    echo "  --quiet | -q"
+    echo "      Do not display the command that will be run. This flag only"
+    echo "      works when the --run flag is specified."
+    echo "  --use-empty | -e"
+    echo "      Required when using the swap command. This specifies an empty"
+    echo "      tape slot that will be used for swapping tapes between the"
+    echo "      source and target slots."
+    echo "  --reverse"
+    echo "      Reverses tape order while transfering tapes; for the swap"
+    echo "      command, it will reverse both source and target tape sets."
+    echo "  --reverse-source"
+    echo "      Similar to --reverse, but only the source tapes are reversed."
+    echo "  --reverse-target"
+    echo "      Similar to --reverse, but only the target tapes are reversed.".
+    echo ""
+}
+
+if [[ -z "$1" || $1 == "-h" || $1 == "--help" || $1 == "help" ]]; then
+    runhelp
+    exit 0
+fi
+
 # Set defaults
 default_args() {
     declare -g -A ARGS
@@ -19,8 +67,7 @@ parse_args() {
     declare -a NON_FLAGS
     # Parse flag arguments
     while [[ $# -gt 0 ]]; do
-        ARG="$1"
-        case $ARG in
+        case $1 in
         -f)
             ARGS[CHANGER]="$2"
             shift; shift ;;
@@ -44,7 +91,7 @@ parse_args() {
             ARGS[REV_TARGET]=1
             shift ;;
         *)
-            NON_FLAGS+=("$ARG")
+            NON_FLAGS+=("$1")
             shift ;;
         esac
     done
@@ -62,11 +109,26 @@ parse_args() {
 
 # Validate args
 check_args() {
-    #TODO source and target each must be a valid slot range or list of slots/ranges
-    #TODO source and target must have the exact same number of slots
-    #TODO swap commands must have a use-empty slot set
-    #TODO throw error if quiet is set and run is not set
-    echo "TODO"
+    # Parse source and target into arrays of slot numbers
+    SOURCE_LIST=($( int_csl2list ${ARGS[SOURCE]} ))
+    TARGET_LIST=($( int_csl2list ${ARGS[TARGET]} ))
+    # Ensure source and target lists have the exact same number of slots
+    if [[ ${#SOURCE_LIST[@]} -ne ${#TARGET_LIST[@]} ]]; then
+        echo "ERROR: Source and target have differing number of slots. Source: ${#SOURCE_LIST[@]} Target: ${#TARGET_LIST[@]}"
+        exit 1
+    fi
+
+    # If command is swap, ensure a use-empty slot is set (and valid integer)
+    if [[ ${ARGS[COMMAND]} == "swap" && ! ${ARGS[EMPTY_SLOT]} =~ ^[0-9]+$ ]]; then
+        echo "ERROR: Swap command given, but empty slot is not set to a valid value. See --use-empty flag."
+        exit 1
+    fi
+
+    # Throw error if quiet is set and run is not set
+    if [[ ${ARGS[QUIET]} -eq 1 && ${ARGS[RUN]} -ne 1 ]]; then
+        echo "ERROR: With quiet flag set and run flag not set, there is nothing to do."
+        exit 1
+    fi
 }
 
 ###############################
