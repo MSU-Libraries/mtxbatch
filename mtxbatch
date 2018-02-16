@@ -217,7 +217,7 @@ index_of_value() {
 ## Creates the list of tape tranfer pairs to perform the requested move command
 ##  $1 -> The source tape slot numbers, space delimited
 ##  $2 -> The target tape slot numbers, space delimited
-##
+## Prints the mtx commands to perform the operation, or runs the mtx command if run flag is set
 generate_move_transfers() {
     SRC=($1)
     TGT=($2)
@@ -256,13 +256,15 @@ generate_move_transfers() {
 ##  $1 -> The source tape slot numbers, space delimited
 ##  $2 -> The target tape slot numbers, space delimited
 ##  $3 -> The empty tape slot number
-##
+## Prints the mtx commands to perform the operation, or runs the mtx command if run flag is set
 generate_swap_transfers() {
     SRC=($1)
     TGT=($2)
 
     # Handle reversing the tape order, if requested
-    #TODO
+    if [[ ${ARGS[REV_SOURCE]} -eq 1 && ${ARGS[REV_TARGET]} -eq 1 ]]; then
+        SRC=($( reverse_array "${SRC[*]}" ))
+    fi
 
     # Perform the swaps
     for IDX in "${!SRC[@]}"; do
@@ -272,6 +274,32 @@ generate_swap_transfers() {
         run_mtx ${SRC[$IDX]} ${ARGS[EMPTY_SLOT]}
         run_mtx ${TGT[$IDX]} ${SRC[$IDX]}
         run_mtx ${ARGS[EMPTY_SLOT]} ${TGT[$IDX]}
+    done
+
+    if [[ ${ARGS[REV_SOURCE]} -eq 1 && ${ARGS[REV_TARGET]} -ne 1 ]]; then
+        # Reverse tape order of source tapes (which are now in target slots)
+        reverse_in_place "${TGT[*]}"
+    fi
+    if [[ ${ARGS[REV_TARGET]} -eq 1 && ${ARGS[REG_SOURCE]} -ne 1 ]]; then
+        # Reverse tape order of target tapes (which are now in source slots)
+        reverse_in_place "${SRC[*]}"
+    fi
+}
+
+###############################
+## Given a space delimited string of slot numbers, reverse the tape order of those tapes
+##  $1 -> The source tape slot numbers, space delimited
+## Prints the mtx commands to perform the operation, or runs the mtx command if run flag is set
+reverse_in_place() {
+    SLOTS=($1)
+    TOTAL=${#SLOTS[@]}
+    HALF=$(( $TOTAL / 2 ))
+    for I in $( seq 0 $HALF ); do
+        FR=${SLOTS[$I]}
+        TO=${SLOTS[$TOTAL-$I-1]}
+        run_mtx ${FR} ${ARGS[EMPTY_SLOT]}
+        run_mtx ${TO} ${FR}
+        run_mtx ${ARGS[EMPTY_SLOT]} ${TO}
     done
 }
 
