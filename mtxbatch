@@ -55,14 +55,17 @@ parse_args() {
     ARGS[TARGET]=${NON_FLAGS[2]}
     # If additional arguments exists, error and exit
     if [[ ! -z ${NON_FLAGS[3]} ]]; then
-       echo "ERROR: Unknown extra arguments: ${NON_FLAGS[@]:3}"
-       exit 1
+        echo "ERROR: Unknown extra arguments: ${NON_FLAGS[@]:3}"
+        exit 1
     fi
 }
 
 # Validate args
 check_args() {
-    #TODO
+    #TODO source and target each must be a valid slot range or list of slots/ranges
+    #TODO source and target must have the exact same number of slots
+    #TODO swap commands must have a use-empty slot set
+    #TODO throw error if quiet is set and run is not set
     echo "TODO"
 }
 
@@ -71,15 +74,39 @@ check_args() {
 ##  $1 -> An integer range (e.g. 3-8) or a simple integer (e.g. 5)
 ## Prints the expanded list of ingeters generated from the range, or just prints the simple integer passed
 int_range2list() {
-    #TODO
-    echo "TODO"
+    # If a simple number passed in, then just print it and return
+    if [[ $1 =~ ^[0-9]+$ ]]; then
+        echo $1
+    elif [[ $1 =~ ^[0-9]+-[0-9]+$ ]]; then
+        SPLT=(${1/-/ })
+        echo $( seq ${SPLT[0]} 1 ${SPLT[1]} )
+    else
+        echo "ERROR: Could not parse slot range: $1"
+        exit 1
+    fi
 }
 
-# Convert a comma separated list of integers and ranges into a single list of integers
+###############################
+## Convert a comma separated list of integers and ranges into a single list of integers
+##  $1 -> A list of integers and integer ranges, comma separated (e.g. 4,6,9-11)
+## Prints a space delimited string of integers in the list, ranges enumerated, results sorted with duplicates removed
 int_csl2list() {
-    #TODO
-    echo "TODO"
+    SLOTS=()
+    RLIST=(${1//,/ })
+    for R in "${RLIST[@]}"; do
+        SLOTS+=($( int_range2list $R ))
+    done
+
+    # Remove duplicates and sort ascending
+    echo $( printf "%d\n" "${SLOTS[@]}" | sort -nu )
 }
+
+#NOTES:
+# Do not attempt to move/swap slots if the slots numbers are the same (duh)
+# On --run, ensure changer device exists
+# On move w/ --run, check to make sure target slots are empty first (UNLESS target is part of move)
+# On swap w/ --run, check to make sure use-empty slot is actually empty first
+# On move, if target has slots also in source, mtx actions must be reordered to prevent conflict
 
 
 # Start
