@@ -218,6 +218,11 @@ generate_move_transfers() {
     SRC=($1)
     TGT=($2)
 
+    # Handle reversing the lists, if requested
+    if [[ ${ARGS[REV_SOURCE]} -eq 1 ]]; then
+        SRC=($( reverse_array "${SRC[*]}" ))
+    fi
+
     # Handle cases where source and target slots overlap
     DIF=($( array_diff "${TGT[*]}" "${SRC[*]}" ))
     while [[ "${DIF[*]}" != "${TGT[*]}" && ${#DIF[@]} -gt 0 ]]; do
@@ -277,12 +282,26 @@ run_mtx() {
 }
 
 ###############################
+## Given an array in the form of space delimited string, reverse the values (first to last)
+##  $1 -> A string of space delimited values
+## Output the reversed array, space delimited
+reverse_array() {
+    ARR=($1)
+    REV=()
+    for V in "${ARR[@]}"; do
+        REV=($V ${REV[@]})
+    done
+    echo "${REV[*]}"
+}
+
+###############################
 ## Perform the command given
 do_command() {
+    # Proceed with commands
     if [[ ${ARGS[COMMAND]} == "move" ]]; then
         generate_move_transfers "${SOURCE_LIST[*]}" "${TARGET_LIST[*]}"
     elif [[ ${ARGS[COMMAND]} == "swap" ]]; then
-        generate_swap_transfers "" ""
+        generate_swap_transfers "${SOURCE_LIST[*]}" "${TARGET_LIST[*]}"
     fi
 }
 

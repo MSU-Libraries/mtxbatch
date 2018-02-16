@@ -8,6 +8,7 @@ Features
 - Preserves ordering of tapes in set (by default, can optionally reverse order)
 - Specify tapes as list, a range, or a combination of lists and ranges
 - Specify which slot to use as temporary storage when swapping tapes
+- Handles situations where slots from source location overlap with target location slots
 
 Examples
 --------------------------
