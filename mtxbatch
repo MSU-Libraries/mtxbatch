@@ -139,6 +139,10 @@ check_args() {
         echo "ERROR: With quiet flag set and run flag not set, there is nothing to do."
         exit 1
     fi
+
+    #TODO On --run, ensure changer device exists
+    #TODO On move w/ --run, check to make sure target slots are empty (UNLESS target slot is part of source slot list)
+    #TODO On swap w/ --run, check to make sure use-empty slot is actually empty
 }
 
 ###############################
@@ -218,7 +222,7 @@ generate_move_transfers() {
     SRC=($1)
     TGT=($2)
 
-    # Handle reversing the lists, if requested
+    # Handle reversing the list, if requested
     if [[ ${ARGS[REV_SOURCE]} -eq 1 ]]; then
         SRC=($( reverse_array "${SRC[*]}" ))
     fi
@@ -254,7 +258,21 @@ generate_move_transfers() {
 ##  $3 -> The empty tape slot number
 ##
 generate_swap_transfers() {
-    echo "TODO"
+    SRC=($1)
+    TGT=($2)
+
+    # Handle reversing the tape order, if requested
+    #TODO
+
+    # Perform the swaps
+    for IDX in "${!SRC[@]}"; do
+        if [[ ${SRC[$IDX]} -eq ${TGT[$IDX]} ]]; then
+            continue;
+        fi
+        run_mtx ${SRC[$IDX]} ${ARGS[EMPTY_SLOT]}
+        run_mtx ${TGT[$IDX]} ${SRC[$IDX]}
+        run_mtx ${ARGS[EMPTY_SLOT]} ${TGT[$IDX]}
+    done
 }
 
 ###############################
@@ -304,14 +322,6 @@ do_command() {
         generate_swap_transfers "${SOURCE_LIST[*]}" "${TARGET_LIST[*]}"
     fi
 }
-
-#NOTES:
-# Do not attempt to move/swap slots if the slots numbers are the same (duh)
-# On move, if target has slots also in source, mtx actions must be reordered to prevent conflict
-# On --run, ensure changer device exists
-# On move w/ --run, check to make sure target slots are empty first (UNLESS target is part of move)
-# On swap w/ --run, check to make sure use-empty slot is actually empty first
-
 
 # Start
 default_args
