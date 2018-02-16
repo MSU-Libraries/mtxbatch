@@ -45,7 +45,7 @@ mtxbatch -f /dev/changer move 1-20 51-70 --run --quiet
 Command Use
 --------------------------
 ```
-mtxchanger -f <changer-device> command SOURCE TARGET [flags]
+mtxbatch -f <changer-device> command SOURCE TARGET [flags]
 ```
 
 `-f <changer-device>` This specifies the tape changer which will be passed on to the `mtx` command's `-f` flag.  

@@ -5,7 +5,7 @@ MTX_CMD=mtx
 # Script help
 runhelp() {
     echo ""
-    echo "Usage: mtxchanger -f <changer-device> command SOURCE TARGET [flags]"
+    echo "Usage: mtxbatch -f <changer-device> command SOURCE TARGET [flags]"
     echo ""
     echo "    Prints out a series of mtx commands to perform a range of tape"
     echo "moves, or to swap one range of tapes with another. Will preserve"
@@ -41,7 +41,11 @@ runhelp() {
     echo "  --reverse-source"
     echo "      Similar to --reverse, but only the source tapes are reversed."
     echo "  --reverse-target"
-    echo "      Similar to --reverse, but only the target tapes are reversed.".
+    echo "      Similar to --reverse, but only the target tapes are reversed."
+    echo "      This does nothing if the selected command is move."
+    echo "  --skip-run-checks"
+    echo "      Do not perform validity checks before attempting to run mtx"
+    echo "      commands. This does nothing if --run flag is not set."
     echo ""
 }
 
@@ -59,6 +63,7 @@ default_args() {
     ARGS[TARGET]=
     ARGS[EMPTY_SLOT]=
     ARGS[RUN]=0
+    ARGS[SKIP_RUNCHECKS]=0
     ARGS[QUIET]=0
     ARGS[REV_SOURCE]=0
     ARGS[REV_TARGET]=0
@@ -91,6 +96,9 @@ parse_args() {
             shift ;;
         --reverse-target)
             ARGS[REV_TARGET]=1
+            shift ;;
+        --skip-run-checks)
+            ARGS[SKIP_RUNCHECKS]=1
             shift ;;
         *)
             NON_FLAGS+=("$1")
@@ -140,9 +148,37 @@ check_args() {
         exit 1
     fi
 
-    #TODO On --run, ensure changer device exists
-    #TODO On move w/ --run, check to make sure target slots are empty (UNLESS target slot is part of source slot list)
-    #TODO On swap w/ --run, check to make sure use-empty slot is actually empty
+    # Extra checks if run flag is set
+    if [[ ${ARGS[RUN]} -eq 1 && ${ARGS[SKIP_RUNCHECKS]} -ne 1 ]]; then
+        # Ensure changer device exists
+        if ! [[ -c ${ARGS[CHANGER]} ]]; then
+            echo "ERROR: Could not find changer-device: ${ARGS[CHANGER]}"
+            exit 1
+        fi
+
+        # Get list of tapes and slots from changer
+        #TODO
+
+        # Move run checks
+        if [[ ${ARGS[COMMAND]} == "move" ]]; then
+            # Check to make sure source slots are not empty
+            #TODO
+
+            # Check to make sure target slots are empty (UNLESS target slot is part of source slot list)
+            #TODO
+            echo "TODO"
+        fi
+
+        # Swap run checks
+        if [[ ${ARGS[COMMAND]} == "swap" ]]; then
+            # Check to make sure all source and target slots have tapes in them
+            #TODO
+
+            # Check to make sure use-empty slot is actually empty
+            #TODO
+            echo "TODO"
+        fi
+    fi
 }
 
 ###############################
@@ -322,7 +358,7 @@ run_mtx() {
 
     # Attempt to run command
     if [[ ${ARGS[RUN]} -eq 1 ]]; then
-        echo "TODO"
+        echo "TODO run"
         #TODO throw error and exit if tape command fails
     fi
 }
