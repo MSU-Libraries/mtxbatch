@@ -13,17 +13,17 @@ Examples
 --------------------------
 Print the list of commands to move a batch of tapes from one slot range (1-20) to another (51-60):  
 ```
-mtxbatch -f /dev/changer transfer 1-20 51-70
+mtxbatch -f /dev/changer move 1-20 51-70
 ```
 
 Print the list of commands to move a batch of tapes, AND run the commands as you print them:  
 ```
-mtxbatch -f /dev/changer transfer 1-20 51-70 --run
+mtxbatch -f /dev/changer move 1-20 51-70 --run
 ```
 
 Print a list of commands to move tapes from a list of ranges to another list of ranges:  
 ```
-mtxbatch -f /dev/changer transfer 1-5,8,10-14 51-61
+mtxbatch -f /dev/changer move 1-5,8,10-14 51-61
 ```
 
 Print a list of command to swap tapes in one range with tapes in another range, also specifying the empty slot to use while swapping:  
@@ -38,7 +38,7 @@ mtxbatch -f /dev/changer swap 6-10 21-25 --use-empty 40 --reverse
 
 Run command to move a range of tapes to another range, but suppress printing out the commands being run:  
 ```
-mtxbatch -f /dev/changer transfer 1-20 51-70 --run --quiet
+mtxbatch -f /dev/changer move 1-20 51-70 --run --quiet
 ```
 
 Command Use
@@ -49,7 +49,7 @@ mtxchanger -f <changer-device> command SOURCE TARGET [flags]
 
 `-f <changer-device>` This specifies the tape changer which will be passed on to the `mtx` command's `-f` flag.  
 
-`command` This can be either `transfer` or `swap`. The `transfer` commmand will move all tapes from the SOURCE slots to the TARGET slots. The `swap` command will move all the tapes from SOURCE slots over to TARGET slots, and will also move all tapes from the TARGET slots back into the SOURCE slots.  
+`command` This can be either `move` or `swap`. The `move` commmand will transfer all tapes from the SOURCE slots to the TARGET slots. The `swap` command will transfer all the tapes from SOURCE slots over to TARGET slots, and will also transfer all tapes from the TARGET slots back into the SOURCE slots.  
 
 _Flags_:  
  - `--run` This will have `mtxbatch` attempt to run each command rather than just print them to stdout.

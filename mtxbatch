@@ -1,5 +1,7 @@
 #!/bin/bash
 
+MTX_CMD=mtx
+
 # Script help
 runhelp() {
     echo ""
@@ -15,7 +17,7 @@ runhelp() {
     echo "  -f <changer-device>"
     echo "      This specifies the tape changer to be passed to the mtx command"
     echo "  command"
-    echo "      This can be either 'transfer' or 'swap'. With 'transfer' merely"
+    echo "      This can be either 'move' or 'swap'. With 'move' merely"
     echo "      moving the tapes from the source slots to the target slots, and"
     echo "      'swap' doing the same, but also moving tapes from the target"
     echo "      slots back into the source slots."
@@ -34,7 +36,7 @@ runhelp() {
     echo "      tape slot that will be used for swapping tapes between the"
     echo "      source and target slots."
     echo "  --reverse"
-    echo "      Reverses tape order while transfering tapes; for the swap"
+    echo "      Reverses tape order while moving tapes; for the swap"
     echo "      command, it will reverse both source and target tape sets."
     echo "  --reverse-source"
     echo "      Similar to --reverse, but only the source tapes are reversed."
@@ -109,12 +111,20 @@ parse_args() {
 
 # Validate args
 check_args() {
+    declare -g -a SOURCE_LIST
+    declare -g -a TARGET_LIST
     # Parse source and target into arrays of slot numbers
-    SOURCE_LIST=($( int_csl2list ${ARGS[SOURCE]} ))
-    TARGET_LIST=($( int_csl2list ${ARGS[TARGET]} ))
+    SOURCE_LIST=($( slotlist2array ${ARGS[SOURCE]} ))
+    TARGET_LIST=($( slotlist2array ${ARGS[TARGET]} ))
     # Ensure source and target lists have the exact same number of slots
     if [[ ${#SOURCE_LIST[@]} -ne ${#TARGET_LIST[@]} ]]; then
         echo "ERROR: Source and target have differing number of slots. Source: ${#SOURCE_LIST[@]} Target: ${#TARGET_LIST[@]}"
+        exit 1
+    fi
+
+    # Ensure valid command given
+    if ! [[ ${ARGS[COMMAND]} == "swap" || ${ARGS[COMMAND]} == "move" ]]; then
+        echo "ERROR: Only valid commands are move and swap. Invalid command given: ${ARGS[COMMAND]}"
         exit 1
     fi
 
@@ -135,7 +145,7 @@ check_args() {
 ## Convert a single integer range to list of integers
 ##  $1 -> An integer range (e.g. 3-8) or a simple integer (e.g. 5)
 ## Prints the expanded list of ingeters generated from the range, or just prints the simple integer passed
-int_range2list() {
+slotrange2array() {
     # If a simple number passed in, then just print it and return
     if [[ $1 =~ ^[0-9]+$ ]]; then
         echo $1
@@ -152,28 +162,139 @@ int_range2list() {
 ## Convert a comma separated list of integers and ranges into a single list of integers
 ##  $1 -> A list of integers and integer ranges, comma separated (e.g. 4,6,9-11)
 ## Prints a space delimited string of integers in the list, ranges enumerated, results sorted with duplicates removed
-int_csl2list() {
+slotlist2array() {
     SLOTS=()
     RLIST=(${1//,/ })
     for R in "${RLIST[@]}"; do
-        SLOTS+=($( int_range2list $R ))
+        SLOTS+=($( slotrange2array $R ))
     done
 
     # Remove duplicates and sort ascending
     echo $( printf "%d\n" "${SLOTS[@]}" | sort -nu )
 }
 
+###############################
+## Returns the list of space separated values in the first argument that do not exist in the second argument
+##  $1 -> A string of space separated values
+##  $2 -> A string of space separated values
+## Prints a list of space separated values from the first argument where none of those values exist in the second
+array_diff() {
+    A1=($1)
+    A2=($2)
+    DIFF=()
+    for V1 in ${A1[@]}; do
+        for V2 in ${A2[@]}; do
+            if [[ $V1 == $V2 ]]; then
+                continue 2
+            fi
+        done
+        DIFF+=($V1)
+    done
+    echo "${DIFF[@]}"
+}
+
+###############################
+## Get the first index number in the given space delimited string that matches the given value
+##  $1 -> The space delimited string
+##  $2 -> The value to match in finding the index
+## Prints the index number, or -1 if not found
+index_of_value() {
+    SEARCH=($1)
+    for IDX in "${!SEARCH[@]}"; do
+        if [[ ${SEARCH[$IDX]} == $2 ]]; then
+            echo $IDX
+            return
+        fi
+    done
+    echo "-1"
+}
+
+###############################
+## Creates the list of tape tranfer pairs to perform the requested move command
+##  $1 -> The source tape slot numbers, space delimited
+##  $2 -> The target tape slot numbers, space delimited
+##
+generate_move_transfers() {
+    SRC=($1)
+    TGT=($2)
+
+    # Handle cases where source and target slots overlap
+    DIF=$( array_diff "${TGT[@]}" "${SRC[@]}" )
+    while [[ $DIF != $TGT && ${#TGT[@]} -gt 0 ]]; do
+        # Identify slots and index
+        T_SLOT=${TGT[0]}
+        IDX=$( index_of_value "${TGT[*]}" $T_SLOT )
+        S_SLOT=${SRC[$IDX]}
+        # Do the mtx command
+        run_mtx $S_SLOT $T_SLOT
+        # Remove slots from SRC and TGT
+        unset SRC[$IDX]
+        unset TGT[$IDX]
+        # Recalculate to check for another overlap
+        DIF=$( array_diff "${TGT[@]}" "${SRC[@]}" )
+    done
+
+    # For remaining slots, move them one for one
+    for IDX in "${!SRC[@]}"; do
+        run_mtx ${SRC[$IDX]} ${TGT[$IDX]}
+    done
+}
+
+###############################
+## Creates the list of tape tranfer pairs to perform the requested swap command
+##  $1 -> The source tape slot numbers, space delimited
+##  $2 -> The target tape slot numbers, space delimited
+##  $3 -> The empty tape slot number
+##
+generate_swap_transfers() {
+    echo "TODO"
+}
+
+###############################
+## Prints (and runs, if flag is set) the mtx command for the given slots
+##  $1 -> The slot to move the tape from
+##  $2 -> The slot to move the tape to
+## Outputs the mtx command first, and then runs the command (if run is set) afterward
+run_mtx() {
+    # Skip this command if from/to are the same
+    if [[ $1 -eq $2 ]]; then
+        return
+    fi
+
+    # Create mtx command string
+    RUN_MTX="${MTX_CMD} -f ${ARGS[CHANGER]} transfer $1 $2"
+    if [[ ${ARGS[QUIET]} -ne 1 ]]; then
+        echo "$RUN_MTX"
+    fi
+
+    # Attempt to run command
+    if [[ ${ARGS[RUN]} -eq 1 ]]; then
+        echo "TODO"
+        #TODO throw error and exit if tape command fails
+    fi
+}
+
+###############################
+## Perform the command given
+do_command() {
+    if [[ ${ARGS[COMMAND]} == "move" ]]; then
+        generate_move_transfers "${SOURCE_LIST[*]}" "${TARGET_LIST[*]}"
+    elif [[ ${ARGS[COMMAND]} == "swap" ]]; then
+        generate_swap_transfers "" ""
+    fi
+}
+
 #NOTES:
 # Do not attempt to move/swap slots if the slots numbers are the same (duh)
+# On move, if target has slots also in source, mtx actions must be reordered to prevent conflict
 # On --run, ensure changer device exists
 # On move w/ --run, check to make sure target slots are empty first (UNLESS target is part of move)
 # On swap w/ --run, check to make sure use-empty slot is actually empty first
-# On move, if target has slots also in source, mtx actions must be reordered to prevent conflict
 
 
 # Start
 default_args
 parse_args "$@"
 check_args
-
+do_command
 
