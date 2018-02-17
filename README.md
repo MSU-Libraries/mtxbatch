@@ -59,6 +59,7 @@ _Flags_:
  - `--reverse` Reverses tape order (first becomes last, last becomes first) while moving tapes; for the `swap` command, it will reverse both SOURCE and TARGET tape sets. This also works when specifying a list of tape slots/ranges for either SOURCE or TARGET.
  - `--reverse-source` Similar to `--reverse`, but only the SOURCE tapes are reversed when using the `swap` command.
  - `--reverse-target` Similar to `--reverse`, but only the TARGET tapes are reversed when using the `swap` command.
+ - `--skip-run-checks` Do not perform validity checks before attempting to run mtx commands.
 
 
 Author and Copyright

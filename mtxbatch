@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# @author Nathan Collins, npcollins/gmail/com
+
 MTX_CMD=mtx
 
 # Script help
@@ -112,7 +114,7 @@ parse_args() {
     ARGS[TARGET]=${NON_FLAGS[2]}
     # If additional arguments exists, error and exit
     if [[ ! -z ${NON_FLAGS[3]} ]]; then
-        echo "ERROR: Unknown extra arguments: ${NON_FLAGS[@]:3}"
+        echo "ERROR! Unknown extra arguments: ${NON_FLAGS[@]:3}"
         exit 1
     fi
 }
@@ -126,58 +128,89 @@ check_args() {
     TARGET_LIST=($( slotlist2array ${ARGS[TARGET]} ))
     # Ensure source and target lists have the exact same number of slots
     if [[ ${#SOURCE_LIST[@]} -ne ${#TARGET_LIST[@]} ]]; then
-        echo "ERROR: Source and target have differing number of slots. Source: ${#SOURCE_LIST[@]} Target: ${#TARGET_LIST[@]}"
+        echo "ERROR! Source and target have differing number of slots. Source: ${#SOURCE_LIST[@]} Target: ${#TARGET_LIST[@]}"
         exit 1
     fi
 
     # Ensure valid command given
     if ! [[ ${ARGS[COMMAND]} == "swap" || ${ARGS[COMMAND]} == "move" ]]; then
-        echo "ERROR: Only valid commands are move and swap. Invalid command given: ${ARGS[COMMAND]}"
+        echo "ERROR! Only valid commands are move and swap. Invalid command given: ${ARGS[COMMAND]}"
         exit 1
     fi
 
     # If command is swap, ensure a use-empty slot is set (and valid integer)
     if [[ ${ARGS[COMMAND]} == "swap" && ! ${ARGS[EMPTY_SLOT]} =~ ^[0-9]+$ ]]; then
-        echo "ERROR: Swap command given, but empty slot is not set to a valid value. See --use-empty flag."
+        echo "ERROR! Swap command given, but empty slot is not set to a valid value. See --use-empty flag."
         exit 1
     fi
 
     # Throw error if quiet is set and run is not set
     if [[ ${ARGS[QUIET]} -eq 1 && ${ARGS[RUN]} -ne 1 ]]; then
-        echo "ERROR: With quiet flag set and run flag not set, there is nothing to do."
+        echo "ERROR! With quiet flag set and run flag not set, there is nothing to do."
         exit 1
     fi
 
     # Extra checks if run flag is set
+    RUN_FAIL=0
     if [[ ${ARGS[RUN]} -eq 1 && ${ARGS[SKIP_RUNCHECKS]} -ne 1 ]]; then
+        if [[ ${ARGS[QUIET]} -ne 1 ]]; then
+            echo "Performing run checks before starting."
+        fi
+
         # Ensure changer device exists
         if ! [[ -c ${ARGS[CHANGER]} ]]; then
-            echo "ERROR: Could not find changer-device: ${ARGS[CHANGER]}"
+            echo "ERROR! Could not find changer-device: ${ARGS[CHANGER]}"
             exit 1
         fi
 
         # Get list of tapes and slots from changer
-        #TODO
+        declare -A ELEMS
+        $MTX_CMD -d ${ARGS[CHANGER]} status | while read L; do
+            if [[ $L =~ "Storage Element ([0-9]+):(Full|Empty)" ]]; then
+                ELEMS[${BASH_REMATCH[1]}]=${BASH_REMATCH[2]}
+            fi
+        done
+
+        # Check to make sure source slots are not empty
+        for N in "${SOURCE_LIST[@]}"; do
+            if [[ ${ELEMS[$N]} != "Full" ]]; then
+                echo "ERROR! Source tape slot is missing or empty: $N"
+                RUN_FAIL=1
+            fi
+        done;
 
         # Move run checks
         if [[ ${ARGS[COMMAND]} == "move" ]]; then
-            # Check to make sure source slots are not empty
-            #TODO
-
             # Check to make sure target slots are empty (UNLESS target slot is part of source slot list)
-            #TODO
-            echo "TODO"
+            DIF=($( array_diff "${TARGET_LIST[*]}" "${SOURCE_LIST[*]}" ))
+            for N in "${DIF[@]}"; do
+                if [[ ${ELEMS[$N]} != "Full" ]]; then
+                    echo "ERROR! Target tape slot is missing or not empty: $N"
+                    RUN_FAIL=1
+                fi
+            done;
         fi
 
         # Swap run checks
         if [[ ${ARGS[COMMAND]} == "swap" ]]; then
-            # Check to make sure all source and target slots have tapes in them
-            #TODO
+            # Check to make sure all target slots have tapes in them
+            for N in "${TARGET_LIST[@]}"; do
+                if [[ ${ELEMS[$N]} != "Full" ]]; then
+                    echo "ERROR! Target tape slot is missing or empty: $N"
+                    RUN_FAIL=1
+                fi
+            done;
 
             # Check to make sure use-empty slot is actually empty
-            #TODO
-            echo "TODO"
+            if [[ ${ELEMS[${ARGS[EMPTY_SLOT]}]} != "Empty" ]]; then
+                echo "ERROR! The use-empty slot is missing or not empty."
+                RUN_FAIL=1
+            fi
         fi
+    fi
+
+    if [[ $RUN_FAIL -eq 1 ]]; then
+        exit 1
     fi
 }
 
@@ -193,7 +226,7 @@ slotrange2array() {
         SPLT=(${1/-/ })
         echo $( seq ${SPLT[0]} 1 ${SPLT[1]} )
     else
-        echo "ERROR: Could not parse slot range: $1"
+        echo "ERROR! Could not parse slot range: $1"
         exit 1
     fi
 }
@@ -358,8 +391,12 @@ run_mtx() {
 
     # Attempt to run command
     if [[ ${ARGS[RUN]} -eq 1 ]]; then
-        echo "TODO run"
-        #TODO throw error and exit if tape command fails
+        $RUN_MTX
+        MTX_CODE=$?
+        if [[ $MTX_CODE -ne 0 ]]; then
+            echo "ERROR! Command failed: $RUN_MTX"
+            exit 1
+        fi
     fi
 }
 
