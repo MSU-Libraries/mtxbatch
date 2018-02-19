@@ -37,6 +37,9 @@ runhelp() {
     echo "      Required when using the swap command. This specifies an empty"
     echo "      tape slot that will be used for swapping tapes between the"
     echo "      source and target slots."
+    echo "  --allow-empty"
+    echo "      When moving or swapping tapes, preserve any empty slots"
+    echo "      included in the command. i.e. The empty slot is \"moved\"."
     echo "  --reverse"
     echo "      Reverses tape order while moving tapes; for the swap"
     echo "      command, it will reverse both source and target tape sets."
@@ -64,6 +67,7 @@ default_args() {
     ARGS[SOURCE]=
     ARGS[TARGET]=
     ARGS[EMPTY_SLOT]=
+    ARGS[ALLOW_EMPTY]=0
     ARGS[RUN]=0
     ARGS[SKIP_RUNCHECKS]=0
     ARGS[QUIET]=0
@@ -89,6 +93,9 @@ parse_args() {
         --use-empty|-e)
             ARGS[EMPTY_SLOT]="$2"
             shift; shift ;;
+        --allow-empty)
+            ARGS[ALLOW_EMPTY]=1
+            shift ;;
         --reverse)
             ARGS[REV_SOURCE]=1
             ARGS[REV_TARGET]=1
@@ -150,34 +157,40 @@ check_args() {
         exit 1
     fi
 
+    # Populate tape elements array only if it will be needed
+    declare -g -A ELEMS
+    if [[ ${ARGS[ALLOW_EMPTY]} -eq 1 ]] || [[ ${ARGS[RUN]} -eq 1 && ${ARGS[SKIP_RUNCHECKS]} -ne 1 ]]; then
+        # Get list of tapes and slots from changer
+        $MTX_CMD -d ${ARGS[CHANGER]} status | while read L; do
+            if [[ $L =~ "Storage Element ([0-9]+):(Full|Empty)" ]]; then
+                ELEMS[${BASH_REMATCH[1]}]=${BASH_REMATCH[2]}
+            fi
+        done
+        MTX_CMD_E=${PIPESTATUS[0]}
+        if [[ $MTX_CMD_E -ne 0 ]]; then
+            echo "ERROR! Could not query changer status to discover empty tape slots."
+            exit 1
+        fi
+    fi
+
     # Extra checks if run flag is set
     RUN_FAIL=0
     if [[ ${ARGS[RUN]} -eq 1 && ${ARGS[SKIP_RUNCHECKS]} -ne 1 ]]; then
-        if [[ ${ARGS[QUIET]} -ne 1 ]]; then
-            echo "Performing run checks before starting."
-        fi
-
         # Ensure changer device exists
         if ! [[ -c ${ARGS[CHANGER]} ]]; then
             echo "ERROR! Could not find changer-device: ${ARGS[CHANGER]}"
             exit 1
         fi
 
-        # Get list of tapes and slots from changer
-        declare -A ELEMS
-        $MTX_CMD -d ${ARGS[CHANGER]} status | while read L; do
-            if [[ $L =~ "Storage Element ([0-9]+):(Full|Empty)" ]]; then
-                ELEMS[${BASH_REMATCH[1]}]=${BASH_REMATCH[2]}
-            fi
-        done
-
         # Check to make sure source slots are not empty
-        for N in "${SOURCE_LIST[@]}"; do
-            if [[ ${ELEMS[$N]} != "Full" ]]; then
-                echo "ERROR! Source tape slot is missing or empty: $N"
-                RUN_FAIL=1
-            fi
-        done;
+        if [[ ${ARGS[ALLOW_EMPTY]} -ne 1 ]]; then
+            for N in "${SOURCE_LIST[@]}"; do
+                if [[ ${ELEMS[$N]} != "Full" ]]; then
+                    echo "ERROR! Source tape slot is missing or empty: $N"
+                    RUN_FAIL=1
+                fi
+            done
+        fi
 
         # Move run checks
         if [[ ${ARGS[COMMAND]} == "move" ]]; then
@@ -188,18 +201,20 @@ check_args() {
                     echo "ERROR! Target tape slot is missing or not empty: $N"
                     RUN_FAIL=1
                 fi
-            done;
+            done
         fi
 
         # Swap run checks
         if [[ ${ARGS[COMMAND]} == "swap" ]]; then
             # Check to make sure all target slots have tapes in them
-            for N in "${TARGET_LIST[@]}"; do
-                if [[ ${ELEMS[$N]} != "Full" ]]; then
-                    echo "ERROR! Target tape slot is missing or empty: $N"
-                    RUN_FAIL=1
-                fi
-            done;
+            if [[ ${ARGS[ALLOW_EMPTY]} -ne 1 ]]; then
+                for N in "${TARGET_LIST[@]}"; do
+                    if [[ ${ELEMS[$N]} != "Full" ]]; then
+                        echo "ERROR! Target tape slot is missing or empty: $N"
+                        RUN_FAIL=1
+                    fi
+                done
+            fi
 
             # Check to make sure use-empty slot is actually empty
             if [[ ${ELEMS[${ARGS[EMPTY_SLOT]}]} != "Empty" ]]; then
@@ -239,7 +254,12 @@ slotlist2array() {
     SLOTS=()
     RLIST=(${1//,/ })
     for R in "${RLIST[@]}"; do
-        SLOTS+=($( slotrange2array $R ))
+        SR2A=$( slotrange2array $R )
+        SR2A_E=$?
+        if [[ $SR2A_E -ne 0 ]]; then
+            exit 1
+        fi
+        SLOTS+=(${SR2A})
     done
 
     # Remove duplicates and sort ascending
@@ -380,6 +400,11 @@ reverse_in_place() {
 run_mtx() {
     # Skip this command if from/to are the same
     if [[ $1 -eq $2 ]]; then
+        return
+    fi
+
+    # If allowing empty slots to migrate, then skip if from slot is empty
+    if [[ ${ARGS[ALLOW_EMPTY]} -eq 1 ]] && [[ ${ELEMS[$1]} == "Empty" ]]; then
         return
     fi
 
