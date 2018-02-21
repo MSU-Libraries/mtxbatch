@@ -161,7 +161,7 @@ check_args() {
     declare -g -A ELEMS
     if [[ ${ARGS[ALLOW_EMPTY]} -eq 1 ]] || [[ ${ARGS[RUN]} -eq 1 && ${ARGS[SKIP_RUNCHECKS]} -ne 1 ]]; then
         # Get list of tapes and slots from changer
-        $MTX_CMD -d ${ARGS[CHANGER]} status | while read L; do
+        $MTX_CMD -f ${ARGS[CHANGER]} status | while read L; do
             if [[ $L =~ "Storage Element ([0-9]+):(Full|Empty)" ]]; then
                 ELEMS[${BASH_REMATCH[1]}]=${BASH_REMATCH[2]}
             fi
