@@ -161,16 +161,19 @@ check_args() {
     declare -g -A ELEMS
     if [[ ${ARGS[ALLOW_EMPTY]} -eq 1 ]] || [[ ${ARGS[RUN]} -eq 1 && ${ARGS[SKIP_RUNCHECKS]} -ne 1 ]]; then
         # Get list of tapes and slots from changer
-        $MTX_CMD -f ${ARGS[CHANGER]} status | while read L; do
-            if [[ $L =~ "Storage Element ([0-9]+):(Full|Empty)" ]]; then
-                ELEMS[${BASH_REMATCH[1]}]=${BASH_REMATCH[2]}
-            fi
-        done
-        MTX_CMD_E=${PIPESTATUS[0]}
+        MTXSTAT="$( $MTX_CMD -f ${ARGS[CHANGER]} status )"
+        MTX_CMD_E=$?
         if [[ $MTX_CMD_E -ne 0 ]]; then
             echo "ERROR! Could not query changer status to discover empty tape slots."
             exit 1
         fi
+        while read L; do
+            echo "LINE: $L"
+            if [[ "$L" =~ Storage[[:space:]]Element[[:space:]]([0-9]+)[^:]*:(Full|Empty) ]]; then
+                echo " - MATCH: ${BASH_REMATCH[1]} => ${BASH_REMATCH[2]}"
+                ELEMS[${BASH_REMATCH[1]}]=${BASH_REMATCH[2]}
+            fi
+        done <<< "$MTXSTAT"
     fi
 
     # Extra checks if run flag is set
