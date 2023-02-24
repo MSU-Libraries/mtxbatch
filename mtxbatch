@@ -7,7 +7,7 @@ MTX_CMD=mtx
 # Script help
 runhelp() {
     echo ""
-    echo "Usage: mtxbatch -f <changer-device> command SOURCE TARGET [FLAGS]"
+    echo "Usage: mtxbatch -f <changer-device> COMMAND SOURCE TARGET [FLAGS]"
     echo ""
     echo "    Prints out a series of mtx commands to perform a range of tape"
     echo "moves, or to swap one range of tapes with another. Will preserve"
@@ -18,7 +18,7 @@ runhelp() {
     echo "ARGUMENTS:"
     echo "  -f <changer-device>"
     echo "      This specifies the tape changer to be passed to the mtx command"
-    echo "  command"
+    echo "  COMMAND"
     echo "      This can be either 'move' or 'swap'. With 'move' merely"
     echo "      moving the tapes from the source slots to the target slots, and"
     echo "      'swap' doing the same, but also moving tapes from the target"
@@ -75,6 +75,15 @@ default_args() {
     ARGS[REV_TARGET]=0
 }
 
+## Check if mtx command is available
+mtx_exists() {
+    DUMMY=$( $MTX_CMD -h 2>&1 )
+    if [[ $? -eq 127 ]]; then
+        return 1
+    fi
+    return 0
+}
+
 # Parse command arguments
 parse_args() {
     declare -a NON_FLAGS
@@ -86,6 +95,10 @@ parse_args() {
             shift; shift ;;
         --run)
             ARGS[RUN]=1
+            if ! mtx_exists; then
+                echo "ERROR! Could not find command to run: $MTX_CMD"
+                exit 1
+            fi
             shift ;;
         --quiet|-q)
             ARGS[QUIET]=1

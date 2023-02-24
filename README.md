@@ -53,13 +53,13 @@ mtxbatch -f <changer-device> command SOURCE TARGET [flags]
 `command` This can be either `move` or `swap`. The `move` commmand will transfer all tapes from the SOURCE slots to the TARGET slots. The `swap` command will transfer all the tapes from SOURCE slots over to TARGET slots, and will also transfer all tapes from the TARGET slots back into the SOURCE slots.  
 
 _Flags_:  
- - `--run` This will have `mtxbatch` attempt to run each command rather than just print them to stdout.
- - `--quiet` This will surppress the printing of commands to stdout.
  - `--use-empty` Only used when performing the `swap` command. This flags takes a slot number argument where it will temporarily place tapes while swapping. The slot number specified must be empty.
  - `--allow-empty` When moving or swapping tapes, preserve any empty slots included in the command. i.e. The empty slot is "moved" as well.
  - `--reverse` Reverses tape order (first becomes last, last becomes first) while moving tapes; for the `swap` command, it will reverse both SOURCE and TARGET tape sets. This also works when specifying a list of tape slots/ranges for either SOURCE or TARGET.
  - `--reverse-source` Similar to `--reverse`, but only the SOURCE tapes are reversed when using the `swap` command.
  - `--reverse-target` Similar to `--reverse`, but only the TARGET tapes are reversed when using the `swap` command.
+ - `--run` This will have `mtxbatch` attempt to run each command rather than just print them to stdout.
+ - `--quiet` This will suppress the printing of commands to stdout.
  - `--skip-run-checks` Do not perform validity checks before attempting to run mtx commands.
 
 

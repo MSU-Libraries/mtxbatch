@@ -1,0 +1,132 @@
+.TH "mtxbatch" "1" "24 Feb 2023" "" ""
+.SH "NAME"
+mtxbatch \- generate mtx commands to move/swap tapes
+
+.SH "SYNOPSIS"
+.B mtxbatch
+-f <changer-device> COMMAND SOURCE TARGET [FLAGS]
+
+.SH "DESCRIPTION"
+.PP
+Generates (and optionally runs) mtx commands to move sets of tapes
+from one location to another, or to swap tapes in one location
+with another set of tapes.
+
+.SH "USAGE"
+.PP
+Use of mtxbatch requires specifying the tape changer device with the
+.B -f
+flag. Then a command must be specified, either of
+.TP
+.B move
+Move the specified tapes from the SOURCE slots to the TARGET slots
+.TP
+.B swap
+Move tapes from the SOURCE slots to the TARGET slots and also
+move tapes from the TARGET slots to the SOURCE slots.
+The swap command requires use of the
+.B --use-empty
+flag.
+.PP
+By default, the ordering of tapes will be preserved unless a
+flag is given to alter the ordering.
+
+Unless the
+.B --run
+flag is specified, mtxbatch will output the commands that would
+need to be run, but will not call mtx. This is effectly a dry-run
+by default, an also allows generating of the commands on a
+machine without mtx.
+
+.SH "SOURCE / TARGET"
+.PP
+Both SOURCE and TARGET may be comma delimited lists of integers
+to to identify tape slots. Use of a hyphen to indicate a
+range is also supported. Examples:
+.IP
+    1,4,7               # Three individual slots.
+    5-10                # A range of six slots.
+    1,10-14,17,21-23    # Mix of ranges and single slots.
+    19,20-22,14,2-6     # Can be out of order, will use slot order.
+
+.SH "FLAGS"
+.TP
+.B --use-empty
+Only used when performing the
+.B swap
+command. This flags takes a slot number argument where it will temporarily place tapes while swapping. The slot number specified must be empty.
+.TP
+.B --allow-empty
+When moving or swapping tapes, preserve any empty slots included in the command. i.e. The empty slot is "moved" as well.
+.TP
+.B
+--reverse
+Reverses tape order (first becomes last, last becomes first) while moving tapes; for the
+.B swap
+command, it will reverse both SOURCE and TARGET tape sets. This also works when specifying a list of tape slots/ranges for either SOURCE or TARGET.
+.TP
+.B --reverse-source
+Similar to
+.B --reverse
+but only the SOURCE tapes are reversed when using the
+.B swap
+command.
+.TP
+.B --reverse-target
+Similar to
+.B --reverse
+but only the TARGET tapes are reversed when using the
+.B swap
+command.
+.TP
+.B --run
+This will have
+.B mtxbatch
+attempt to run each command rather than just print them to stdout.
+.TP
+.B --quiet
+This will suppress the printing of commands to stdout.
+.TP
+.B --skip-run-checks
+Do not perform validity checks before attempting to run mtx commands.
+
+.SH "EXAMPLES"
+.PP
+Print the list of commands to move a batch of tapes from one slot range (1-20) to another (51-60):
+.IP
+mtxbatch -f /dev/changer move 1-20 51-70
+.PP
+Print the list of commands to move a batch of tapes, AND run the commands as you print them:
+.IP
+mtxbatch -f /dev/changer move 1-20 51-70 --run
+.PP
+Print a list of commands to move tapes from a list of ranges to another list of ranges:
+.IP
+mtxbatch -f /dev/changer move 1-5,8,10-14 51-61
+.PP
+Print a list of command to swap tapes in one range with tapes in another range, also specifying the empty slot to use while swapping:
+.IP
+mtxbatch -f /dev/changer swap 6-10 21-25 --use-empty 40
+.PP
+Print commands to swap a list of tapes in one range with another range, and reverse the order of tapes when swapping them:
+.IP
+mtxbatch -f /dev/changer swap 6-10 21-25 --use-empty 40 --reverse
+.PP
+Run command to move a range of tapes to another range, but suppress printing out the commands being run:
+.IP
+mtxbatch -f /dev/changer move 1-20 51-70 --run --quiet
+
+.SH "REPORTING BUGS"
+.PP
+Please report any bugs at <https://github.com/msu-libraries/mtxbatch>
+
+.SH "COPYRIGHT"
+.PP
+Copyright (c) 2018 Michigan State University Board of Trustees
+.PP
+Released under the Apache License 2.0
+
+.SH "AUTHOR"
+.PP
+Written by Nathan Collins <npcollins/gmail/com>
+
