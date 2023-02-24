@@ -7,7 +7,7 @@ MTX_CMD=mtx
 # Script help
 runhelp() {
     echo ""
-    echo "Usage: mtxbatch -f <changer-device> command SOURCE TARGET [flags]"
+    echo "Usage: mtxbatch -f <changer-device> command SOURCE TARGET [FLAGS]"
     echo ""
     echo "    Prints out a series of mtx commands to perform a range of tape"
     echo "moves, or to swap one range of tapes with another. Will preserve"
@@ -28,12 +28,7 @@ runhelp() {
     echo "      slot numbers, or slot number ranges."
     echo ""
     echo "FLAGS:"
-    echo "  --run"
-    echo "      Attempt to run the mtx commands to perform the given command."
-    echo "  --quiet | -q"
-    echo "      Do not display the command that will be run. This flag only"
-    echo "      works when the --run flag is specified."
-    echo "  --use-empty | -e"
+    echo "  -e | --use-empty"
     echo "      Required when using the swap command. This specifies an empty"
     echo "      tape slot that will be used for swapping tapes between the"
     echo "      source and target slots."
@@ -48,6 +43,11 @@ runhelp() {
     echo "  --reverse-target"
     echo "      Similar to --reverse, but only the target tapes are reversed."
     echo "      This does nothing if the selected command is move."
+    echo "  --run"
+    echo "      Attempt to run the mtx commands to perform the given command."
+    echo "  -q | --quiet"
+    echo "      Do not display the command that will be run. This flag only"
+    echo "      works when the --run flag is specified."
     echo "  --skip-run-checks"
     echo "      Do not perform validity checks before attempting to run mtx"
     echo "      commands. This does nothing if --run flag is not set."
@@ -121,7 +121,7 @@ parse_args() {
     ARGS[TARGET]=${NON_FLAGS[2]}
     # If additional arguments exists, error and exit
     if [[ ! -z ${NON_FLAGS[3]} ]]; then
-        echo "ERROR! Unknown extra arguments: ${NON_FLAGS[@]:3}"
+        echo "ERROR! Unknown extra arguments: ${NON_FLAGS[*]:3}"
         exit 1
     fi
 }
@@ -131,8 +131,8 @@ check_args() {
     declare -g -a SOURCE_LIST
     declare -g -a TARGET_LIST
     # Parse source and target into arrays of slot numbers
-    SOURCE_LIST=($( slotlist2array ${ARGS[SOURCE]} ))
-    TARGET_LIST=($( slotlist2array ${ARGS[TARGET]} ))
+    SOURCE_LIST=($( slotlist2array "${ARGS[SOURCE]}" ))
+    TARGET_LIST=($( slotlist2array "${ARGS[TARGET]}" ))
     # Ensure source and target lists have the exact same number of slots
     if [[ ${#SOURCE_LIST[@]} -ne ${#TARGET_LIST[@]} ]]; then
         echo "ERROR! Source and target have differing number of slots. Source: ${#SOURCE_LIST[@]} Target: ${#TARGET_LIST[@]}"
@@ -161,13 +161,13 @@ check_args() {
     declare -g -A ELEMS
     if [[ ${ARGS[ALLOW_EMPTY]} -eq 1 ]] || [[ ${ARGS[RUN]} -eq 1 && ${ARGS[SKIP_RUNCHECKS]} -ne 1 ]]; then
         # Get list of tapes and slots from changer
-        MTXSTAT="$( $MTX_CMD -f ${ARGS[CHANGER]} status )"
+        MTXSTAT="$( $MTX_CMD -f "${ARGS[CHANGER]}" status )"
         MTX_CMD_E=$?
         if [[ $MTX_CMD_E -ne 0 ]]; then
             echo "ERROR! Could not query changer status to discover empty tape slots."
             exit 1
         fi
-        while read L; do
+        while read -r L; do
             if [[ "$L" =~ Storage[[:space:]]Element[[:space:]]([0-9]+)[^:]*:(Full|Empty) ]]; then
                 ELEMS[${BASH_REMATCH[1]}]=${BASH_REMATCH[2]}
             fi
@@ -236,11 +236,11 @@ check_args() {
 ## Prints the expanded list of ingeters generated from the range, or just prints the simple integer passed
 slotrange2array() {
     # If a simple number passed in, then just print it and return
-    if [[ $1 =~ ^[0-9]+$ ]]; then
-        echo $1
-    elif [[ $1 =~ ^[0-9]+-[0-9]+$ ]]; then
+    if [[ "$1" =~ ^[0-9]+$ ]]; then
+        echo "$1"
+    elif [[ "$1" =~ ^[0-9]+-[0-9]+$ ]]; then
         SPLT=(${1/-/ })
-        echo $( seq ${SPLT[0]} 1 ${SPLT[1]} )
+        seq "${SPLT[0]}" 1 "${SPLT[1]}"
     else
         echo "ERROR! Could not parse slot range: $1"
         exit 1
@@ -255,7 +255,7 @@ slotlist2array() {
     SLOTS=()
     RLIST=(${1//,/ })
     for R in "${RLIST[@]}"; do
-        SR2A=$( slotrange2array $R )
+        SR2A=$( slotrange2array "$R" )
         SR2A_E=$?
         if [[ $SR2A_E -ne 0 ]]; then
             exit 1
@@ -264,7 +264,7 @@ slotlist2array() {
     done
 
     # Remove duplicates and sort ascending
-    echo $( printf "%d\n" "${SLOTS[@]}" | sort -nu )
+    printf "%d\n" "${SLOTS[@]}" | sort -nu
 }
 
 ###############################
@@ -276,9 +276,9 @@ array_diff() {
     A1=($1)
     A2=($2)
     DIFF=()
-    for V1 in ${A1[@]}; do
-        for V2 in ${A2[@]}; do
-            if [[ $V1 == $V2 ]]; then
+    for V1 in "${A1[@]}"; do
+        for V2 in "${A2[@]}"; do
+            if [[ "$V1" == "$V2" ]]; then
                 continue 2
             fi
         done
@@ -295,8 +295,8 @@ array_diff() {
 index_of_value() {
     SEARCH=($1)
     for IDX in "${!SEARCH[@]}"; do
-        if [[ ${SEARCH[$IDX]} == $2 ]]; then
-            echo $IDX
+        if [[ "${SEARCH[$IDX]}" == "$2" ]]; then
+            echo "$IDX"
             return
         fi
     done
@@ -322,13 +322,13 @@ generate_move_transfers() {
     while [[ "${DIF[*]}" != "${TGT[*]}" && ${#DIF[@]} -gt 0 ]]; do
         # Identify slots and index
         T_SLOT=${DIF[0]}
-        IDX=$( index_of_value "${TGT[*]}" $T_SLOT )
+        IDX=$( index_of_value "${TGT[*]}" "$T_SLOT" )
         S_SLOT=${SRC[$IDX]}
         # Do the mtx command
-        run_mtx $S_SLOT $T_SLOT
+        run_mtx "$S_SLOT" "$T_SLOT"
         # Remove slots from SRC and TGT
-        unset SRC[$IDX]
-        unset TGT[$IDX]
+        unset "SRC[$IDX]"
+        unset "TGT[$IDX]"
         # Recalculate to check for another overlap
         SRC=(${SRC[*]})
         TGT=(${TGT[*]})
@@ -337,7 +337,7 @@ generate_move_transfers() {
 
     # For remaining slots, move them one for one
     for IDX in "${!SRC[@]}"; do
-        run_mtx ${SRC[$IDX]} ${TGT[$IDX]}
+        run_mtx "${SRC[$IDX]}" "${TGT[$IDX]}"
     done
 }
 
@@ -361,9 +361,9 @@ generate_swap_transfers() {
         if [[ ${SRC[$IDX]} -eq ${TGT[$IDX]} ]]; then
             continue;
         fi
-        run_mtx ${SRC[$IDX]} ${ARGS[EMPTY_SLOT]}
-        run_mtx ${TGT[$IDX]} ${SRC[$IDX]}
-        run_mtx ${ARGS[EMPTY_SLOT]} ${TGT[$IDX]}
+        run_mtx "${SRC[$IDX]}" "${ARGS[EMPTY_SLOT]}"
+        run_mtx "${TGT[$IDX]}" "${SRC[$IDX]}"
+        run_mtx "${ARGS[EMPTY_SLOT]}" "${TGT[$IDX]}"
     done
 
     if [[ ${ARGS[REV_SOURCE]} -eq 1 && ${ARGS[REV_TARGET]} -ne 1 ]]; then
@@ -383,13 +383,13 @@ generate_swap_transfers() {
 reverse_in_place() {
     SLOTS=($1)
     TOTAL=${#SLOTS[@]}
-    HALF=$(( $TOTAL / 2 ))
+    HALF=$(( TOTAL / 2 ))
     for I in $( seq 0 $HALF ); do
         FR=${SLOTS[$I]}
         TO=${SLOTS[$TOTAL-$I-1]}
-        run_mtx ${FR} ${ARGS[EMPTY_SLOT]}
-        run_mtx ${TO} ${FR}
-        run_mtx ${ARGS[EMPTY_SLOT]} ${TO}
+        run_mtx "${FR}" "${ARGS[EMPTY_SLOT]}"
+        run_mtx "${TO}" "${FR}"
+        run_mtx "${ARGS[EMPTY_SLOT]}" "${TO}"
     done
 }
 
