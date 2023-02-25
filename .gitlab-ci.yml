@@ -1,0 +1,46 @@
+stages:
+  - Build
+  - Release
+
+Build Docs for GitLab:
+  stage: Build
+  tags:
+    - msul-shared
+  image: python:3.10
+  only:
+    - master
+  except:
+    - tags
+  script:
+    - pip install -r requirements.txt
+    - mkdocs build --site-dir public
+  artifacts:
+    paths:
+      - public
+
+GitHub Release:
+  stage: Release
+  tags:
+    - msul-shared
+  image: alpine:latest
+  when: manual
+  only:
+    - master
+  except:
+    - tags
+  needs:
+    - job: Build Docs for GitLab
+      artifacts: true
+  before_script:
+    - apk add git curl
+  script:
+    # Update GitHub code
+    - rm -rf mtxbatch.git
+    - git clone --mirror https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.msu.edu/msu-libraries/systems/mtxbatch.git
+    - cd mtxbatch.git
+    # This will trigger the GitHub CI which builds the MkDocs into the gh-pages branch
+    - git push --force --mirror https://MSU-Libraries:${GITHUB_USER_TOKEN}@github.com/MSU-Libraries/mtxbatch.git
+    - sleep 120 # Needs time to propagate the changes first or this next step will fail
+    # Next we have to re-configure the Pages settings to set gh-pages as the branch again
+    - echo '{"build_type":"legacy","source":{"branch":"gh-pages","path":"/"}' > data.json
+    - "curl -X POST -H 'Accept: application/vnd.github+json' -H \"Authorization: token ${GITHUB_USER_TOKEN}\" https://api.github.com/repos/MSU-Libraries/mtxbatch/pages -d '@data.json'"

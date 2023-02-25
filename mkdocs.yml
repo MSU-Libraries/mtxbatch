@@ -1,0 +1,15 @@
+site_name: mtxbatch
+repo_url: https://github.com/msu-libraries/mtxbatch
+repo_name: msu-libraries/mtxbatch
+
+theme:
+  name: "material"
+
+plugins:
+- search:
+
+nav:
+- Features: /#features
+- Examples: /#examples
+- Command Use: /#command-use
+- Author and Copyright: /#author-and-copyright
