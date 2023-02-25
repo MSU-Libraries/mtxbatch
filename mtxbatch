@@ -1,6 +1,11 @@
 #!/bin/bash
 
+###########################################################
+# mtxbatch - Move (or swap) many tapes in a single command
+#
 # @author Nathan Collins, npcollins/gmail/com
+###########################################################
+VERSION=0.2.0
 
 MTX_CMD=mtx
 
@@ -468,4 +473,3 @@ default_args
 parse_args "$@"
 check_args
 do_command
-

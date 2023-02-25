@@ -8,8 +8,12 @@ theme:
 plugins:
 - search:
 
+markdown_extensions:
+- toc:
+    toc_depth : "1-1"
+
 nav:
-- Features: /#features
-- Examples: /#examples
-- Command Use: /#command-use
-- Author and Copyright: /#author-and-copyright
+- Features: ./#features
+- Examples: ./#examples
+- Command Use: ./#command-use
+- Author and Copyright: ./#author-and-copyright
